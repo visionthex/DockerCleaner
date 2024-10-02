@@ -1,5 +1,9 @@
 #!/bin/bash
-echo -e "${GREEN}Docker Cleaner ${NC}"
+
+# ASCII Art
+echo -e "${GREEN}"
+figlet -f slant "Docker Cleanup"
+echo -e "${NC}"
 
 # Colors for output
 RED='\033[0;31m'
@@ -12,31 +16,77 @@ echo -e "${YELLOW}This script will stop all running Docker containers, remove al
 read -p "Are you sure you want to continue? (y/n): " confirmation
 
 if [[ $confirmation != "y" ]]; then
-	echo -e "${RED}Operation aborted.${NC}"
-	exit 1
+    echo -e "${RED}Operation aborted.${NC}"
+    exit 1
 fi
 
-# Logging: Can be removed if not needed: Logs output into a file
+# Logging
 log_file="docker_cleanup.log"
 echo "Docker Cleaning Script - $(date)" > $log_file
 
+# Function to show progress dots
+show_progress() {
+    pid=$!
+    echo -n "Processing"
+    while kill -0 $pid 2>/dev/null; do
+        echo -n "."
+        sleep 1
+    done
+    echo -e "\n${GREEN}Completed.${NC}"
+}
+
 # Stop all running Containers
-echo -e "${GREEN}Stopping all running containers...${NC}"
-sudo docker stop $(sudo docker ps -aq) &>> $log_file
+containers=$(sudo docker ps -aq)
+if [ -n "$containers" ]; then
+    echo -e "${GREEN}Stopping all running containers...${NC}"
+    sudo docker stop $containers &>> $log_file &
+    show_progress
+else
+    echo -e "${YELLOW}No running containers to stop.${NC}"
+fi
 
 # Remove all containers
-echo -e "${GREEN}Removing all containers...${NC}"
-sudo docker rm $(sudo docker ps -aq) &>> $log_file
+if [ -n "$containers" ]; then
+    echo -e "${GREEN}Removing all containers...${NC}"
+    sudo docker rm $containers &>> $log_file &
+    show_progress
+else
+    echo -e "${YELLOW}No containers to remove.${NC}"
+fi
 
 # Remove all images
-echo -e "${GREEN}Removing all images...${NC}"
-sudo docker rmi $(sudo docker images -q) &>> $log_file
+images=$(sudo docker images -q)
+if [ -n "$images" ]; then
+    echo -e "${GREEN}Removing all images...${NC}"
+    sudo docker rmi $images &>> $log_file &
+    show_progress
+else
+    echo -e "${YELLOW}No images to remove.${NC}"
+fi
+
+# Prune all unused build cache
+echo -e "${GREEN}Pruning all unused build cache...${NC}"
+sudo docker builder prune -a -f &>> $log_file &
+show_progress
 
 # Remove all volumes
-echo -e "${GREEN}Removing all volumes...${NC}"
-sudo docker volume rm $(sudo docker volume ls -q) &>> $log_file
+volumes=$(sudo docker volume ls -q)
+if [ -n "$volumes" ]; then
+    echo -e "${GREEN}Removing all volumes...${NC}"
+    sudo docker volume rm $volumes &>> $log_file &
+    show_progress
+else
+    echo -e "${YELLOW}No volumes to remove.${NC}"
+fi
 
-# Remove all networks
-echo -e "${GREEN}Removing all networks...${NC}"
-sudo docker network rm $(sudo docker network ls -q) &>> $log_file
+# Remove all networks except predefined ones
+networks=$(sudo docker network ls -q | grep -v -E '^(bridge|host|none)$')
+if [ -n "$networks" ]; then
+    echo -e "${GREEN}Removing all networks...${NC}"
+    sudo docker network rm $networks &>> $log_file &
+    show_progress
+else
+    echo -e "${YELLOW}No networks to remove.${NC}"
+fi
+
 echo -e "${YELLOW}Cleanup completed.${NC}"
