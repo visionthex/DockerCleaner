@@ -2,6 +2,11 @@
 
 #### Setting up a Script to Clean Up Docker
 
+**Install figlet**
+```sh
+sudo apt install figlet
+```
+
 1. **Create Your Script:**
    - Open a terminal and create your script file using:
      ```sh
